@@ -1,0 +1,605 @@
+#Versão funcionando 12/08 - 14:10h.
+
+import Dashboard from './components/Dashboard';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
+import XLSX from 'xlsx-js-style';
+
+export default function App() {
+  const [abaAtiva, setAbaAtiva] = useState('novo');
+  const [despesas, setDespesas] = useState([]);
+  const [viagens, setViagens] = useState([]);
+
+  // Todos os Filtros Juntos (Aba Despesas)
+  const [filtroViagem, setFiltroViagem] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+
+  // Form Despesa
+  const [despesaEditando, setDespesaEditando] = useState(null);
+  const [valor, setValor] = useState('');
+  const [categoria, setCategoria] = useState('Alimentação');
+  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const [formaPagamento, setFormaPagamento] = useState('Pix');
+  const [descricao, setDescricao] = useState('');
+  const [viagemId, setViagemId] = useState('');
+  const [comprovante, setComprovante] = useState(null);
+  const [carregando, setCarregando] = useState(false);
+
+  // Form Viagem Inline
+  const [exibirModalViagem, setExibirModalViagem] = useState(false);
+  const [nomeViagem, setNomeViagem] = useState('');
+  const [descViagem, setDescViagem] = useState('');
+  const [salvandoViagem, setSalvandoViagem] = useState(false);
+
+  const buscarDados = async () => {
+    try {
+      const { data: dadosViagens } = await supabase
+        .from('viagens')
+        .select('*')
+        .order('id', { ascending: false });
+
+      setViagens(dadosViagens || []);
+
+      const { data: dadosDespesas } = await supabase
+        .from('despesas')
+        .select('*, viagens(nome)')
+        .order('data', { ascending: false });
+
+      setDespesas(dadosDespesas || []);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    }
+  };
+
+  useEffect(() => {
+    buscarDados();
+  }, []);
+
+  const formatarValorOnBlur = () => {
+    if (!valor) return;
+    const valorLimpo = valor.toString().replace(',', '.');
+    const num = parseFloat(valorLimpo);
+    if (!isNaN(num)) {
+      setValor(num.toFixed(2));
+    }
+  };
+
+  const salvarViagem = async (e) => {
+    e.preventDefault();
+    if (!nomeViagem.trim()) return alert('Informe o nome da viagem!');
+
+    setSalvandoViagem(true);
+    try {
+      const { error } = await supabase
+        .from('viagens')
+        .insert([{ nome: nomeViagem.trim(), descricao: descViagem.trim(), status: 'Ativa' }]);
+
+      if (error) throw error;
+
+      alert('Viagem salva com sucesso!');
+      setNomeViagem('');
+      setDescViagem('');
+      setExibirModalViagem(false);
+      await buscarDados();
+    } catch (err) {
+      alert(`Erro ao salvar viagem: ${err.message}`);
+    } finally {
+      setSalvandoViagem(false);
+    }
+  };
+
+  const limparFormulario = () => {
+    setDespesaEditando(null);
+    setValor('');
+    setCategoria('Alimentação');
+    setData(new Date().toISOString().slice(0, 10));
+    setFormaPagamento('Pix');
+    setDescricao('');
+    setViagemId('');
+    setComprovante(null);
+  };
+
+  const iniciarEdicao = (item) => {
+    setDespesaEditando(item);
+    setValor(item.valor ? Number(item.valor).toFixed(2) : '');
+    setCategoria(item.categoria || 'Alimentação');
+    setData(item.data || new Date().toISOString().slice(0, 10));
+    setFormaPagamento(item.forma_pagamento || 'Pix');
+    setDescricao(item.descricao || '');
+    setViagemId(item.viagem_id ? String(item.viagem_id) : '');
+    setComprovante(null);
+    setAbaAtiva('novo');
+  };
+
+  const excluirDespesa = async (id) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta despesa?')) return;
+
+    try {
+      const { error } = await supabase.from('despesas').delete().eq('id', id);
+      if (error) throw error;
+      alert('Despesa excluída com sucesso!');
+      await buscarDados();
+    } catch (err) {
+      alert(`Erro ao excluir: ${err.message}`);
+    }
+  };
+
+  const salvarDespesa = async (e) => {
+    e.preventDefault();
+    if (!valor) return alert('Informe o valor!');
+
+    setCarregando(true);
+    let comprovanteUrl = despesaEditando?.comprovante_url || null;
+
+    try {
+      // Faz o upload se um novo arquivo foi selecionado
+      if (comprovante) {
+        const fileExt = comprovante.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('comprovantes')
+          .upload(fileName, comprovante, { upsert: true });
+
+        if (uploadError) {
+          throw new Error(`Falha no upload do comprovante: ${uploadError.message}`);
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('comprovantes')
+          .getPublicUrl(fileName);
+
+        comprovanteUrl = urlData.publicUrl;
+      }
+
+      const dadosDespesa = {
+        valor: parseFloat(valor.toString().replace(',', '.')),
+        categoria,
+        data,
+        forma_pagamento: formaPagamento,
+        descricao,
+        viagem_id: viagemId ? parseInt(viagemId) : null,
+        comprovante_url: comprovanteUrl
+      };
+
+      if (despesaEditando) {
+        const { error } = await supabase
+          .from('despesas')
+          .update(dadosDespesa)
+          .eq('id', despesaEditando.id);
+
+        if (error) throw error;
+        alert('Despesa atualizada com sucesso!');
+      } else {
+        const { error } = await supabase.from('despesas').insert([dadosDespesa]);
+        if (error) throw error;
+        alert('Despesa salva com sucesso!');
+      }
+
+      limparFormulario();
+      await buscarDados();
+      setAbaAtiva('despesas');
+    } catch (error) {
+      alert(`Erro ao salvar despesa: ${error.message}`);
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // Aplicação simultânea de todos os filtros
+  const despesasFiltradas = despesas.filter((d) => {
+    if (filtroViagem && String(d.viagem_id) !== String(filtroViagem)) {
+      return false;
+    }
+    if (filtroDataInicio && d.data < filtroDataInicio) {
+      return false;
+    }
+    if (filtroDataFim && d.data > filtroDataFim) {
+      return false;
+    }
+    return true;
+  });
+
+  const limparFiltros = () => {
+    setFiltroViagem('');
+    setFiltroDataInicio('');
+    setFiltroDataFim('');
+  };
+
+  const exportarParaExcel = () => {
+    if (despesasFiltradas.length === 0) return alert('Sem despesas no filtro atual para exportar!');
+
+    // 1. Criar planilha com cabeçalhos
+    const worksheet = XLSX.utils.json_to_sheet([]);
+    const headers = [['Data', 'Viagem/Projeto', 'Categoria', 'Valor (R$)', 'Forma de Pagamento', 'Descrição', 'Comprovante']];
+    XLSX.utils.sheet_add_aoa(worksheet, headers, { origin: 'A1' });
+
+    // Estilo do cabeçalho
+    const headerStyle = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "2563EB" } }, // Azul
+      alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    ['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1'].forEach(cell => {
+      if (worksheet[cell]) worksheet[cell].s = headerStyle;
+    });
+
+    // 2. Adicionar dados
+    const rows = despesasFiltradas.map((item) => {
+      return [
+        item.data ? item.data.split('-').reverse().join('/') : '',
+        item.viagens?.nome || 'Sem Viagem',
+        item.categoria || '',
+        item.valor ? Number(item.valor) : 0,
+        item.forma_pagamento || '',
+        item.descricao || '',
+        item.comprovante_url ? 'Ver Comprovante' : 'Sem comprovante'
+      ];
+    });
+
+    XLSX.utils.sheet_add_aoa(worksheet, rows, { origin: 'A2' });
+
+    // 3. Formatar Hiperlinks e Estilos da Coluna de Comprovante (Coluna G)
+    despesasFiltradas.forEach((item, index) => {
+      const rowIndex = index + 2; // Linha 2 em diante (A1 é o cabeçalho)
+      const cellAddress = `G${rowIndex}`;
+
+      if (item.comprovante_url) {
+        worksheet[cellAddress] = {
+          t: 's',
+          v: 'Ver Comprovante',
+          f: `HYPERLINK("${item.comprovante_url}", "Ver Comprovante")`,
+          l: { Target: item.comprovante_url, Tooltip: 'Clique para abrir o comprovante' },
+          s: {
+            font: { color: { rgb: "0000FF" }, underline: true },
+            alignment: { horizontal: "center" }
+          }
+        };
+      } else {
+        worksheet[cellAddress] = {
+          t: 's',
+          v: 'Sem comprovante',
+          s: {
+            font: { color: { rgb: "888888" }, italic: true },
+            alignment: { horizontal: "center" }
+          }
+        };
+      }
+    });
+
+    // 4. Largura das colunas
+    worksheet['!cols'] = [
+      { wch: 14 }, // Data
+      { wch: 25 }, // Viagem
+      { wch: 18 }, // Categoria
+      { wch: 14 }, // Valor
+      { wch: 18 }, // Forma Pgto
+      { wch: 32 }, // Descrição
+      { wch: 22 }  // Comprovante
+    ];
+
+    // 5. Baixar arquivo Excel
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Despesas');
+    XLSX.writeFile(workbook, `Relatorio_Despesas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const totalFiltrado = despesasFiltradas.reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-gray-100 text-gray-900 pb-24 select-none">
+      <div className="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-40">
+        <div>
+          <h1 className="text-lg font-bold leading-tight">Gestão de Despesas</h1>
+          <p className="text-[10px] opacity-80">Controle Integrado</p>
+        </div>
+        <button
+          onClick={exportarParaExcel}
+          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 shadow"
+        >
+          📥 Excel (.xlsx)
+        </button>
+      </div>
+
+      <div className="p-4">
+        {/* ABA NOVO / EDITAR */}
+        {abaAtiva === 'novo' && (
+          <form onSubmit={salvarDespesa} className="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h2 className="text-md font-bold text-gray-700">
+                {despesaEditando ? '✏️ Editar Despesa' : 'Novo Lançamento'}
+              </h2>
+              {despesaEditando && (
+                <button
+                  type="button"
+                  onClick={limparFormulario}
+                  className="text-xs text-red-600 font-semibold hover:underline"
+                >
+                  ✖ Cancelar Edição
+                </button>
+              )}
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-semibold text-gray-600">Viagem / Projeto</label>
+                <button
+                  type="button"
+                  onClick={() => setExibirModalViagem(!exibirModalViagem)}
+                  className="text-[11px] text-blue-600 font-bold hover:underline"
+                >
+                  {exibirModalViagem ? '✖ Cancelar' : '➕ Criar Nova Viagem'}
+                </button>
+              </div>
+
+              {exibirModalViagem ? (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2 mb-2">
+                  <p className="text-xs font-bold text-blue-800">Cadastrar Nova Viagem</p>
+                  <input
+                    type="text"
+                    placeholder="Nome da Viagem (ex: SP - Cliente X)"
+                    value={nomeViagem}
+                    onChange={(e) => setNomeViagem(e.target.value)}
+                    className="w-full p-2 border rounded-lg text-xs outline-none bg-white"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Descrição / Destino (opcional)"
+                    value={descViagem}
+                    onChange={(e) => setDescViagem(e.target.value)}
+                    className="w-full p-2 border rounded-lg text-xs outline-none bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={salvarViagem}
+                    disabled={salvandoViagem}
+                    className="w-full bg-blue-600 text-white py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700"
+                  >
+                    {salvandoViagem ? 'Salvar...' : 'Salvar Viagem'}
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={viagemId}
+                  onChange={(e) => setViagemId(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl outline-none bg-white text-xs font-medium"
+                >
+                  <option value="">Sem viagem associada (Avulsa)</option>
+                  {viagens.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nome}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Valor (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                required
+                value={valor}
+                onChange={(e) => setValor(e.target.value)}
+                onBlur={formatarValorOnBlur}
+                className="w-full p-3 border rounded-xl outline-none text-lg font-semibold"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria</label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full p-2.5 border rounded-xl outline-none bg-white font-medium"
+              >
+                <option value="Alimentação">Alimentação</option>
+                <option value="Hospedagem">Hospedagem</option>
+                <option value="Combustível">Combustível</option>
+                <option value="Estacionamento">Estacionamento</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Data</label>
+                <input
+                  type="date"
+                  value={data}
+                  onChange={(e) => setData(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl outline-none text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Pagamento</label>
+                <select
+                  value={formaPagamento}
+                  onChange={(e) => setFormaPagamento(e.target.value)}
+                  className="w-full p-2.5 border rounded-xl outline-none bg-white font-medium text-xs"
+                >
+                  <option value="Pix">Pix</option>
+                  <option value="Cartão Corp.">Cartão Corp.</option>
+                  <option value="Cartão Crédito">Cartão Crédito</option>
+                  <option value="Cartão Débito">Cartão Débito</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Descrição</label>
+              <input
+                type="text"
+                placeholder="Ex: Almoço com cliente"
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                className="w-full p-2.5 border rounded-xl outline-none text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Comprovante {despesaEditando?.comprovante_url ? '(Já existe um anexo)' : ''}
+              </label>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setComprovante(e.target.files[0])}
+                className="w-full p-2 border border-dashed rounded-xl text-xs text-gray-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={carregando}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 shadow"
+            >
+              {carregando ? 'Salvando...' : despesaEditando ? 'Atualizar Despesa' : 'Salvar Despesa'}
+            </button>
+          </form>
+        )}
+
+        {/* ABA DESPESAS */}
+        {abaAtiva === 'despesas' && (
+          <div className="space-y-3">
+            <h2 className="text-md font-bold text-gray-700">Lançamentos de Despesas</h2>
+
+            {/* PAINEL UNIFICADO DE FILTROS */}
+            <div className="bg-white p-3 rounded-2xl border shadow-sm space-y-2">
+              <div className="flex justify-between items-center border-b pb-1">
+                <span className="text-xs font-bold text-gray-700 flex items-center gap-1">🔍 Filtrar Lançamentos</span>
+                {(filtroViagem || filtroDataInicio || filtroDataFim) && (
+                  <button
+                    onClick={limparFiltros}
+                    className="text-[11px] text-red-600 font-semibold hover:underline"
+                  >
+                    Limpar Filtros
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Viagem / Projeto</label>
+                <select
+                  value={filtroViagem}
+                  onChange={(e) => setFiltroViagem(e.target.value)}
+                  className="w-full p-2 border rounded-lg outline-none bg-gray-50 text-xs font-medium text-gray-700"
+                >
+                  <option value="">Todas as Viagens</option>
+                  {viagens.map((v) => (
+                    <option key={v.id} value={v.id}>📍 {v.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">De (Data Inicial)</label>
+                  <input
+                    type="date"
+                    value={filtroDataInicio}
+                    onChange={(e) => setFiltroDataInicio(e.target.value)}
+                    className="w-full p-2 border rounded-lg outline-none bg-gray-50 text-xs text-gray-700"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">Até (Data Final)</label>
+                  <input
+                    type="date"
+                    value={filtroDataFim}
+                    onChange={(e) => setFiltroDataFim(e.target.value)}
+                    className="w-full p-2 border rounded-lg outline-none bg-gray-50 text-xs text-gray-700"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-between items-center text-xs font-semibold text-gray-600 border-t">
+                <span>Registros: {despesasFiltradas.length}</span>
+                <span className="text-blue-600 font-bold">Total: R$ {totalFiltrado.toFixed(2).replace('.', ',')}</span>
+              </div>
+            </div>
+
+            {despesasFiltradas.length === 0 ? (
+              <p className="text-center text-gray-500 py-8 text-sm">Nenhuma despesa encontrada para o filtro selecionado.</p>
+            ) : (
+              despesasFiltradas.map((item) => (
+                <div key={item.id} className="bg-white p-3.5 rounded-2xl shadow-sm border space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-gray-800 text-sm">{item.categoria}</span>
+                        {item.viagens?.nome && (
+                          <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md font-semibold">
+                            📍 {item.viagens.nome}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {item.data?.split('-').reverse().join('/')} • {item.forma_pagamento}
+                      </p>
+                      {item.descricao && <p className="text-xs text-gray-600 font-medium mt-1">{item.descricao}</p>}
+                    </div>
+                    <p className="font-black text-blue-600 text-base">R$ {Number(item.valor).toFixed(2).replace('.', ',')}</p>
+                  </div>
+
+                  <div className="flex justify-end items-center gap-2 pt-2 border-t text-xs">
+                    {item.comprovante_url ? (
+                      <a
+                        href={item.comprovante_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 font-semibold mr-auto hover:underline flex items-center gap-1"
+                      >
+                        📎 Ver Comprovante
+                      </a>
+                    ) : (
+                      <span className="text-gray-400 italic text-[11px] mr-auto">Sem comprovante</span>
+                    )}
+
+                    <button
+                      onClick={() => iniciarEdicao(item)}
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1"
+                    >
+                      ✏️ Editar
+                    </button>
+                    <button
+                      onClick={() => excluirDespesa(item.id)}
+                      className="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1"
+                    >
+                      🗑️ Excluir
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ABA RESUMO */}
+        {abaAtiva === 'resumo' && (
+          <Dashboard despesas={despesas} viagens={viagens} />
+        )}
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t flex justify-around py-2 shadow-lg z-50">
+        <button onClick={() => setAbaAtiva('novo')} className={`flex flex-col items-center text-xs ${abaAtiva === 'novo' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+          <span className="text-xl">➕</span>
+          <span>{despesaEditando ? 'Editar' : 'Novo'}</span>
+        </button>
+        <button onClick={() => setAbaAtiva('despesas')} className={`flex flex-col items-center text-xs ${abaAtiva === 'despesas' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+          <span className="text-xl">📋</span>
+          <span>Despesas</span>
+        </button>
+        <button onClick={() => setAbaAtiva('resumo')} className={`flex flex-col items-center text-xs ${abaAtiva === 'resumo' ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+          <span className="text-xl">📊</span>
+          <span>Resumo</span>
+        </button>
+      </div>
+    </div>
+  );
+}

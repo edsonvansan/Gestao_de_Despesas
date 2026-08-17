@@ -1,0 +1,64 @@
+Como funcionará o seu ciclo de versionamento a partir de agora (Passo 4 e adiante):
+Sempre que você alterar o código, testar algo novo e vir que está funcionando perfeitamente, você cria um checkpoint oficial fazendo o seguinte:
+
+Adicionar os arquivos modificados:
+
+Bash
+git add .
+Salvar a versão com uma mensagem explicando o que você fez:
+
+Bash
+git commit -m "Descrição curta do que foi alterado"
+Se a qualquer momento no futuro alguma alteração der errado e você quiser voltar exatamente para o último ponto que estava funcionando, basta digitar:
+
+Bash
+git checkout .
+(Isso limpa qualquer erro recente e restaura o código instantaneamente para o último commit salvo).
+
+Pode rodar os comandos de configuração do passo 3 e me avise se deu tudo certo!
+
+------------------------------------------------------------------------------------------------------------------
+
+Funciona assim:
+
+O que você escreve: Quando você roda o comando de salvamento (git commit -m "..."), a mensagem entre aspas é o título que você escolhe para identificar o que foi feito. Exemplo:
+
+Bash
+git commit -m "Versao 1.0 - Sistema de despesas estavel"
+O que o Git gera sozinho: Por trás dos panos, o Git cria um código identificador único (uma sequência de letras e números, como a1b2c3d) para aquela versão exata.
+
+Como ver a sua "linha do tempo" de versões depois?
+Sempre que você quiser ver o histórico de tudo o que salvou, basta digitar no terminal:
+
+Bash
+git log --oneline
+Ele vai te mostrar uma lista limpa e organizada com todas as versões que você salvou, parecida com isto:
+
+f4e2d1c (HEAD -> master) Ajuste final nos gráficos de pizza
+
+b8a7c6d Correção do layout das despesas
+
+a1b2c3d Versao 1.0 - Sistema de despesas estavel
+
+Dessa forma, fica extremamente fácil saber qual é qual e voltar para qualquer uma delas a momento que você precisar. Pode rodar a configuração do seu e-mail e me avise se deu tudo certo!
+
+------------------------------------------------------------------------------------------------------------------
+
+Como você já fez o commit da versão com os gráficos de barras (692ac3c) e depois alterou o arquivo (provavelmente para colocar o teste supremo), o Git agora vê essas novas modificações como "sujas" ou pendentes na sua árvore de trabalho atual.
+
+Para voltar exatamente para o estado do seu último commit salvo (692ac3c), descartando qualquer alteração que você tenha feito no código depois dele, basta rodar o comando:
+
+Bash
+git reset --hard HEAD
+(Atenção: Esse comando limpa todas as alterações não commitadas que você fez após o commit 692ac3c e deixa o seu código exatamente igual a ele).
+
+Se você quiser alternar entre a versão estável antiga (6951926) e a nova com barras (692ac3c), você pode navegar livremente entre elas usando o comando git checkout:
+
+Para voltar para a versão 1.0 estável antiga:
+
+Bash
+git checkout 6951926
+Para voltar para a versão atual com gráficos de barras:
+
+Bash
+git checkout master
