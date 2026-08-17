@@ -511,7 +511,10 @@ const handleSalvar = async (e) => {
     <div className="max-w-md mx-auto min-h-screen bg-gray-100 flex flex-col justify-between font-sans text-gray-800">
       <header className="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
         <div>
-          <span className="font-bold text-lg block">Gestão de Despesas</span>
+        <span className="font-bold text-lg flex items-center gap-2">
+          <img src="/pwa-192x192.png" alt="Ícone" className="w-6 h-6 object-contain" />
+          Gestão de Despesas
+        </span>
           <span className="text-xs opacity-90">Olá, {perfil?.nome || 'Usuário'}</span>
         </div>
         <div className="flex items-center gap-2">
