@@ -511,10 +511,7 @@ const handleSalvar = async (e) => {
     <div className="max-w-md mx-auto min-h-screen bg-gray-100 flex flex-col justify-between font-sans text-gray-800">
       <header className="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
         <div>
-        <span className="font-bold text-lg" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/pwa-192x192.png" alt="Ícone" style={{ width: '24px', height: '24px' }} />
-          Gestão de Despesas
-        </span>
+        Gestão de Despesas
           <span className="text-xs opacity-90">Olá, {perfil?.nome || 'Usuário'}</span>
         </div>
         <div className="flex items-center gap-2">
