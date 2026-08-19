@@ -509,7 +509,7 @@ export default function App() {
   // Se for Usuário Comum, exibe o app de despesas isolado
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-100 flex flex-col justify-between font-sans text-gray-800">
-     <header className="bg-blue-600 text-white p-4 rounded-xl shadow-md flex justify-between items-center">
+     <header className="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
         <div>
           <div className="font-bold text-base">Gestão de Despesas</div>
           <span className="text-xs opacity-95 block">Olá, {perfil?.nome || 'Usuário'}</span>
