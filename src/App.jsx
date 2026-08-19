@@ -75,7 +75,7 @@ export default function App() {
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error) throw error;
       if (data) setPerfil(data);
     } catch (err) {
@@ -187,27 +187,27 @@ export default function App() {
     if (!file) return null;
 
     try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        
-        const { data, error: uploadError } = await supabase.storage
-            .from('comprovantes')
-            .upload(fileName, file);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
 
-        if (uploadError) {
-            alert('Erro no upload do comprovante: ' + uploadError.message);
-            console.error('Erro detalhado:', uploadError);
-            return null;
-        }
+      const { data, error: uploadError } = await supabase.storage
+        .from('comprovantes')
+        .upload(fileName, file);
 
-        const { data: urlData } = supabase.storage
-            .from('comprovantes')
-            .getPublicUrl(fileName);
-            
-        return urlData.publicUrl;
-    } catch (err) {
-        alert('Erro no processo de upload: ' + err.message);
+      if (uploadError) {
+        alert('Erro no upload do comprovante: ' + uploadError.message);
+        console.error('Erro detalhado:', uploadError);
         return null;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('comprovantes')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (err) {
+      alert('Erro no processo de upload: ' + err.message);
+      return null;
     }
   };
 
@@ -221,11 +221,11 @@ export default function App() {
     try {
       const { data: novaViagem, error } = await supabase
         .from('viagens')
-        .insert([{ 
-          nome: nomeFormatado, 
-          descricao: 'Criado no App', 
+        .insert([{
+          nome: nomeFormatado,
+          descricao: 'Criado no App',
           status: 'Ativa',
-          empresa_id: perfil?.empresa_id 
+          empresa_id: perfil?.empresa_id
         }])
         .select()
         .single();
@@ -244,70 +244,70 @@ export default function App() {
   };
 
   // SALVAR DESPESA
-// SALVAR DESPESA
-const handleSalvar = async (e) => {
-  e.preventDefault();
-  const valorNum = parseValorFloat(valorInput);
+  // SALVAR DESPESA
+  const handleSalvar = async (e) => {
+    e.preventDefault();
+    const valorNum = parseValorFloat(valorInput);
 
-  if (valorNum <= 0) {
-    alert('Informe um valor válido maior que zero!');
-    return;
-  }
+    if (valorNum <= 0) {
+      alert('Informe um valor válido maior que zero!');
+      return;
+    }
 
-  setEnviando(true);
+    setEnviando(true);
 
-  try {
-    let urlArquivo = urlComprovante;
-    
-    // Tenta fazer o upload do arquivo apenas se houver um novo arquivo selecionado
-    if (arquivoComprovante) {
-      const urlUpload = await uploadComprovante(arquivoComprovante);
-      if (urlUpload) {
-        urlArquivo = urlUpload;
-      } else {
-        // Caso queira impedir o salvamento se o comprovante falhar, descomente a linha abaixo:
-        // throw new Error('Falha ao enviar o comprovante.');
+    try {
+      let urlArquivo = urlComprovante;
+
+      // Tenta fazer o upload do arquivo apenas se houver um novo arquivo selecionado
+      if (arquivoComprovante) {
+        const urlUpload = await uploadComprovante(arquivoComprovante);
+        if (urlUpload) {
+          urlArquivo = urlUpload;
+        } else {
+          // Caso queira impedir o salvamento se o comprovante falhar, descomente a linha abaixo:
+          // throw new Error('Falha ao enviar o comprovante.');
+        }
       }
+
+      const payloadSupabase = {
+        valor: valorNum,
+        categoria: categoria || 'Outros',
+        data: data || getHojeLocal(),
+        forma_pagamento: formaPagamento || 'Cartão Corp.',
+        descricao: descricao || '',
+        viagem_id: viagemIdSelecionada ? parseInt(viagemIdSelecionada, 10) : null,
+        comprovante_url: urlArquivo || null,
+        user_id: session.user.id,
+        empresa_id: perfil?.empresa_id
+      };
+
+      if (idEdicao) {
+        const { error } = await supabase
+          .from('despesas')
+          .update(payloadSupabase)
+          .eq('id', idEdicao)
+          .eq('user_id', session.user.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('despesas')
+          .insert([payloadSupabase]);
+
+        if (error) throw error;
+      }
+
+      await carregarDados();
+      resetFormulario();
+      setAbaAtiva('despesas');
+    } catch (err) {
+      console.error('Detalhes do Erro Supabase:', err);
+      alert(`Erro ao gravar despesa: ${err.message || err.details || 'Erro no banco'}`);
+    } finally {
+      setEnviando(false);
     }
-
-    const payloadSupabase = {
-      valor: valorNum,
-      categoria: categoria || 'Outros',
-      data: data || getHojeLocal(),
-      forma_pagamento: formaPagamento || 'Cartão Corp.',
-      descricao: descricao || '',
-      viagem_id: viagemIdSelecionada ? parseInt(viagemIdSelecionada, 10) : null,
-      comprovante_url: urlArquivo || null,
-      user_id: session.user.id,
-      empresa_id: perfil?.empresa_id
-    };
-
-    if (idEdicao) {
-      const { error } = await supabase
-        .from('despesas')
-        .update(payloadSupabase)
-        .eq('id', idEdicao)
-        .eq('user_id', session.user.id);
-
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('despesas')
-        .insert([payloadSupabase]);
-
-      if (error) throw error;
-    }
-
-    await carregarDados();
-    resetFormulario();
-    setAbaAtiva('despesas');
-  } catch (err) {
-    console.error('Detalhes do Erro Supabase:', err);
-    alert(`Erro ao gravar despesa: ${err.message || err.details || 'Erro no banco'}`);
-  } finally {
-    setEnviando(false);
-  }
-};
+  };
 
   // EXCLUIR
   const handleExcluir = async (id) => {
@@ -509,10 +509,10 @@ const handleSalvar = async (e) => {
   // Se for Usuário Comum, exibe o app de despesas isolado
   return (
     <div className="max-w-md mx-auto min-h-screen bg-gray-100 flex flex-col justify-between font-sans text-gray-800">
-      <header className="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
+     <header className="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center">
         <div>
-          <span className="font-bold text-lg block">Gestão de Despesas</span>
-          <span className="text-xs opacity-90">Olá, {perfil?.nome || 'Usuário'}</span>
+          <div className="font-bold text-base">Gestão de Despesas</div>
+          <span className="text-xs opacity-95 block">Olá, {perfil?.nome || 'Usuário'}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -530,7 +530,7 @@ const handleSalvar = async (e) => {
         </div>
       </header>
 
-      <main className="p-4 flex-1 pb-24">
+<main className="p-4 flex-1 pb-24">
         {carregando ? (
           <div className="text-center py-16 space-y-2">
             <div className="animate-spin text-3xl">⚙️</div>
@@ -808,15 +808,15 @@ const handleSalvar = async (e) => {
               </div>
             )}
 
-            {/* ABA 3: RESUMO E GRÁFICOS */}
-            {abaAtiva === 'resumo' && (
+{/* ABA 3: RESUMO E GRÁFICOS */}
+{abaAtiva === 'resumo' && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-base font-bold text-gray-700">📊 Painel Resumo</h2>
+                  <h2 className="text-base font-bold text-gray-900">📊 Painel Resumo</h2>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 rounded-xl shadow-lg">
-                  <p className="text-xs font-medium opacity-80 uppercase tracking-wide">Total Geral Filtrado</p>
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-800 text-white p-4 rounded-xl shadow-lg">
+                  <p className="text-xs font-medium opacity-100 uppercase tracking-wide">Total Geral Filtrado</p>
                   <p className="text-3xl font-extrabold mt-1">{formatarMoeda(totalFiltrado)}</p>
                   <p className="text-[11px] opacity-75 mt-1">{despesasFiltradas.length} lançamento(s) ativo(s)</p>
                 </div>
@@ -833,30 +833,28 @@ const handleSalvar = async (e) => {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 shadow-lg flex justify-around p-2">
+      {/* RODAPÉ DE NAVEGAÇÃO ENTRE ABAS */}
+      <nav className="bg-white border-t border-gray-200 fixed bottom-0 left-0 right-0 max-w-md mx-auto flex justify-around p-3 rounded-xl shadow-lg">
         <button
-          onClick={() => {
-            resetFormulario();
-            setAbaAtiva('novo');
-          }}
-          className={`flex flex-col items-center flex-1 py-1 text-xs font-bold ${abaAtiva === 'novo' ? 'text-blue-600' : 'text-gray-400'}`}
+          onClick={() => setAbaAtiva('novo')}
+          className={`flex flex-col items-center text-xs font-bold ${abaAtiva === 'novo' ? 'text-blue-600' : 'text-gray-400'}`}
         >
-          <span className="text-lg">➕</span>
-          Novo
+          <span>➕</span>
+          <span>Novo</span>
         </button>
         <button
           onClick={() => setAbaAtiva('despesas')}
-          className={`flex flex-col items-center flex-1 py-1 text-xs font-bold ${abaAtiva === 'despesas' ? 'text-blue-600' : 'text-gray-400'}`}
+          className={`flex flex-col items-center text-xs font-bold ${abaAtiva === 'despesas' ? 'text-blue-600' : 'text-gray-400'}`}
         >
-          <span className="text-lg">📋</span>
-          Despesas
+          <span>📋</span>
+          <span>Despesas</span>
         </button>
         <button
           onClick={() => setAbaAtiva('resumo')}
-          className={`flex flex-col items-center flex-1 py-1 text-xs font-bold ${abaAtiva === 'resumo' ? 'text-blue-600' : 'text-gray-400'}`}
+          className={`flex flex-col items-center text-xs font-bold ${abaAtiva === 'resumo' ? 'text-blue-600' : 'text-gray-400'}`}
         >
-          <span className="text-lg">📊</span>
-          Resumo
+          <span>📊</span>
+          <span>Resumo</span>
         </button>
       </nav>
     </div>

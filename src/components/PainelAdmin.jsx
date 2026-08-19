@@ -39,7 +39,7 @@ export default function PainelAdmin({ empresaId }) {
     setEnviando(true);
 
     try {
-      // 1. Criar usuário no Auth
+      // 1. Criar usuário no Auth do Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password: senha,
@@ -48,27 +48,25 @@ export default function PainelAdmin({ empresaId }) {
       if (error) throw error;
       if (!data.user) throw new Error('Erro ao criar usuário no sistema.');
 
-      // 2. Gravar perfil completo (incluindo email)
+      // 2. Gravar o perfil vinculado na tabela 'profiles'
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert([{
           id: data.user.id,
-          nome: nome,        // Nome digitado
-          email: email,      // E-mail incluído para conferência
+          nome: nome,
+          email: email,
           empresa_id: empresaId,
           funcao: 'usuario'
         }], { onConflict: ['id'] });
 
       if (profileError) throw profileError;
 
-      // 3. O "Pulo do Gato": Forçar o usuário admin a logar novamente
-      // Como o signUp loga o usuário novo, buscamos a sessão do Admin (se você tiver salvo)
-      // ou apenas redirecionamos ou limpamos a sessão para evitar o login indesejado.
-      alert('Colaborador cadastrado com sucesso!'); await supabase.auth.signOut();
+      alert('Colaborador cadastrado com sucesso!');
       
-      // Limpa os campos
+      // Limpa os campos e recarrega a lista sem deslogar o admin
       setNome(''); setEmail(''); setSenha('');
       carregarUsuarios();
+
     } catch (err) {
       alert(`Erro ao criar: ${err.message}`);
     } finally {
