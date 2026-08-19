@@ -4,13 +4,12 @@
   "version": "0.0.0",
   "type": "module",
 "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint . --ext js,jsx --report-unused-disable-directives",
-    "preview": "vite preview",
-    "deploy:full": "npm run build && npx vercel --prod",
-    "deploy:dev": "npm run build && npx vercel"
-  },
+  "dev": "vite",
+  "build": "vite build",
+  "deploy:dev": "vercel",
+  "deploy:full": "npm run build && npx vercel --prod",
+  "deploy:all": "git add . && git commit -m 'Atualizacao geral automatizada' && git push origin dev && git checkout main && git merge dev && git push origin main && git checkout dev"
+},
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
     "json2csv": "^6.0.0-alpha.2",
