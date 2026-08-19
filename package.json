@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
+"scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives",
     "preview": "vite preview",
-    "deploy:full": "npm run build && npx vercel --prod"
+    "deploy:full": "npm run build && npx vercel --prod",
+    "deploy:dev": "npm run build && npx vercel"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
